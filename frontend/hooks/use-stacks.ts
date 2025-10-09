@@ -7,6 +7,7 @@ import {
   type UserData,
   UserSession,
 } from "@stacks/connect";
+import { STACKS_TESTNET } from "@stacks/network";
 import { PostConditionMode } from "@stacks/transactions";
 import { useEffect, useState } from "react";
 
@@ -15,7 +16,8 @@ const appDetails = {
   icon: "https://cryptologos.cc/logos/stacks-stx-logo.png",
 };
 
-const appConfig = new AppConfig(["store_write"]);
+// Explicitly target Testnet to align with contract/network config
+const appConfig = new AppConfig(["store_write"], STACKS_TESTNET);
 const userSession = new UserSession({ appConfig });
 
 export function useStacks() {
@@ -124,13 +126,73 @@ export function useStacks() {
   }
 
   useEffect(() => {
-    if (userSession.isSignInPending()) {
-      userSession.handlePendingSignIn().then((userData) => {
-        setUserData(userData);
-      });
-    } else if (userSession.isUserSignedIn()) {
-      setUserData(userSession.loadUserData());
-    }
+    (async () => {
+      try {
+        // Proactively clear corrupted session blobs before any SDK calls
+        try {
+          if (typeof window !== "undefined") {
+            const maybeSession = window.localStorage.getItem("blockstack:session");
+            if (maybeSession) {
+              try {
+                const parsed = JSON.parse(maybeSession);
+                if (!parsed || typeof parsed.version !== "string") {
+                  window.localStorage.removeItem("blockstack:session");
+                }
+              } catch {
+                window.localStorage.removeItem("blockstack:session");
+              }
+            }
+            const maybeStacksSession = window.localStorage.getItem("stacks-session");
+            if (maybeStacksSession) {
+              try {
+                const parsed = JSON.parse(maybeStacksSession);
+                if (!parsed || typeof parsed.version !== "string") {
+                  window.localStorage.removeItem("stacks-session");
+                }
+              } catch {
+                window.localStorage.removeItem("stacks-session");
+              }
+            }
+          }
+        } catch (_err) {
+          console.warn("Session storage sanitize failed:", _err);
+        }
+        let isPending = false;
+        try {
+          isPending = userSession.isSignInPending();
+        } catch (_err) {
+          console.warn("isSignInPending threw, clearing session:", _err);
+          userSession.signUserOut();
+        }
+        if (isPending) {
+          const data = await userSession.handlePendingSignIn();
+          setUserData(data);
+          return;
+        }
+        let isSignedIn = false;
+        try {
+          isSignedIn = userSession.isUserSignedIn();
+        } catch (_err) {
+          console.warn("isUserSignedIn threw, clearing session:", _err);
+          userSession.signUserOut();
+          isSignedIn = false;
+        }
+        if (isSignedIn) {
+          // Guard against corrupted/old session state
+          try {
+            const data = userSession.loadUserData();
+            setUserData(data);
+          } catch (_err) {
+            console.warn("Invalid session data, signing out:", _err);
+            userSession.signUserOut();
+            setUserData(null);
+          }
+        }
+      } catch (_err) {
+        console.error("Wallet session init failed:", _err);
+        setUserData(null);
+      }
+    })();
   }, []);
 
   useEffect(() => {
