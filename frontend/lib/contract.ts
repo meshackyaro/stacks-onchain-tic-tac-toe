@@ -13,7 +13,7 @@ import {
 
 // REPLACE THESE WITH YOUR OWN
 const CONTRACT_ADDRESS = "ST3QGZ6VKAQVFT5YFXWMDQGSXK1NVAH8DJ8S7M5SG";
-const CONTRACT_NAME = "stx-tic-tac-toe";
+const CONTRACT_NAME = "stacks-tic-tac-toe";
 
 type GameCV = {
   "player-one": PrincipalCV;
