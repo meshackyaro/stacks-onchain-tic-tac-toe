@@ -13,7 +13,7 @@ import {
 
 // REPLACE THESE WITH YOUR OWN
 const CONTRACT_ADDRESS = "ST3QGZ6VKAQVFT5YFXWMDQGSXK1NVAH8DJ8S7M5SG";
-const CONTRACT_NAME = "tic-tac-toe";
+const CONTRACT_NAME = "stx-tic-tac-toe";
 
 type GameCV = {
   "player-one": PrincipalCV;
@@ -81,6 +81,27 @@ export async function getAllGames() {
       // Avoid crashing the server component; surface empty list instead
       console.error("getAllGames failed:", _err);
       return [] as Game[];
+    }
+  }
+  
+  // ADDED FUNCTIONALITY: Fetch total number of games created from the contract
+  // This function calls the new get-total-games-created read-only function
+  export async function getTotalGamesCreated() {
+    try {
+      const totalGamesCV = (await fetchCallReadOnlyFunction({
+        contractAddress: CONTRACT_ADDRESS,
+        contractName: CONTRACT_NAME,
+        functionName: "get-total-games-created",
+        functionArgs: [],
+        senderAddress: CONTRACT_ADDRESS,
+        network: NETWORK,
+      })) as UIntCV;
+
+      // Convert the uintCV to a JS/TS number type
+      return parseInt(totalGamesCV.value.toString());
+    } catch (_err) {
+      console.error("getTotalGamesCreated failed:", _err);
+      return 0; // Return 0 if the call fails
     }
   }
   
